@@ -68,7 +68,10 @@ def get_script(script_url):
     result = requests.get(script_url)
     c = result.content
     soup = BeautifulSoup(c, 'lxml')
-    ssc = soup.find_all(class_='scrolling-script-container')[0]
+    try:
+        ssc = soup.find_all(class_='scrolling-script-container')[0]
+    except IndexError:
+        return ('', '')
     title = soup.find_all('h1')[0]
     return ssc.text, title.text[:-13]
 
@@ -88,13 +91,14 @@ def go():
             + ' have been scraped.')
 
     print('Now going through list of script URLs and scraping them...')
-
-    with open(index_filename, 'wt') as result_file:
+    with open('scripts.csv', 'wt') as result_file:
         wr = csv.writer(result_file)
         for script_url in all_script_urls:
             script, title = get_script(script_url)
-            row = [title + ',' + script]
-            wr.writerow(row)
+            if not script == '':
+                row = [title + ',' + script]
+                wr.writerow(row)
+            print(title + ' scraped')
 
 
-#go()
+go()
