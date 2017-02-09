@@ -96,7 +96,7 @@ def go():
         for script_url in all_script_urls:
             script, title = get_script(script_url)
             if not script == '':
-                row = [title + ',' + script]
+                row = [title, script]
                 wr.writerow(row)
             print(title + ' scraped')
 
