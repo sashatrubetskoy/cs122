@@ -38,13 +38,13 @@ def go(n_topics=10, n_top_words=20, n_samples=20000, n_features=3000):
     2. We then extract only the scripts, not the movie titles.
         The assumption is no script is under 100, no title over 100. (line 54)
     3. Set up vectorizer with appropriate parameters. (line 58)
-    4. Use vectorizer to learn vocab, returning term-document matrix. (line 62)
+    4. Use vectorizer to learn vocab, returning document-term matrix. (line 62)
     5. Set up LDA modeller with appropriate parameters. (line 68)
     6. Use LDA modeller to fit LDA model on term-document matrix: (line 73)
         a. First the t-d matrix is decomposed into "document-term" and
             "topic-term" matrices.
         b. Topic-term matrix is stored as components_.
-        c. Document-term matrix can be calculated from .transform method.
+        c. Document-topic matrix can be calculated from .transform method.
     7. Print stuff (lines 77-8)
     '''
     stop_words = get_stop_words() # Expand stop words
