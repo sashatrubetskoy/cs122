@@ -44,7 +44,8 @@ def go(n_topics=10, n_top_words=20, n_samples=20000, n_features=3000):
         a. First the t-d matrix is decomposed into "document-term" and
             "topic-term" matrices.
         b. Topic-term matrix is stored as components_.
-        c. Document-topic matrix can be calculated from .transform method.
+        c. Document-topic matrix can be calculated by running:
+            lda.transform(tf)
     7. Print stuff (lines 77-8)
     '''
     stop_words = get_stop_words() # Expand stop words
