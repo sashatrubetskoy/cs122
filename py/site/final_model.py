@@ -24,7 +24,7 @@ class CollaborativeTopicModel:
     nullval: number to use for 
     """
 
-    def __init__(self, printout = True, full = False, n_topic = 75, lamu = 0.05, lamv = 3000, n_voca = 5000, nullval = 3.5, e = 1e-100, error_diff = 0.001, params = 2, ratingsfile = 'ratings_100K.csv', scriptsfile = "matched1.csv"):
+    def __init__(self, printout = True, full = False, n_topic = 75, lamu = 0.05, lamv = 3000, n_voca = 5000, nullval = 3.5, e = 1e-100, error_diff = 0.001, params = 2, ratingsfile = 'data/ratings_100K.csv', scriptsfile = "data/matched.csv"):
         
         #User x Item ratings matrix, Splitting into Train and Test, making dict of names to movieIDs
         print('Cleaning Ratings')
@@ -33,7 +33,7 @@ class CollaborativeTopicModel:
         #Build Topic Model
 
         #self.lda = my_topics.Lda_model(n_topic, n_voca, scriptsfile)
-        self.lda = pickle.load(open('final_LDA.p', 'rb'))
+        self.lda = pickle.load(open('py/site/LatentDirAll.p', 'rb'))
         self.theta = self.lda.topic_dist
 
         #lambda_u = sigma_u^2 / sigma^2
@@ -148,7 +148,7 @@ class CollaborativeTopicModel:
 
 
 
-    def fit(self, print_out, n_iter = 20):
+    def fit(self, print_out = True, n_iter = 20):
         print("Learning U and V...\n")
         t0 = time()
         old_err = 0
@@ -283,11 +283,16 @@ class CollaborativeTopicModel:
         #retrieving recommendations based on predicted ratings
         predictions_matrix = self.predict_item()
         predictions = pd.Series(predictions_matrix[predictions_matrix.shape[0]-1], index=self.V.columns)
-        recs = predictions.sort_values(ascending=False)[:10]
+        recs = predictions.sort_values(ascending=False)
 
         result = []
+        c = 0
         for r in recs.index.values:
-            result.append((r,self.movienames[r]))
+            c += 1
+            if r not in movie_ratings.keys():
+                result.append((r,self.movienames[r]))
+            if c == 6: # This is how many recommendations it will display
+                break
 
         #topics = self.U[new_user_id].sort_values(ascending = False).index.values[:topics_to_see]
         #self.topics = self.lda.get_topics(topics, words_to_see)
@@ -295,5 +300,19 @@ class CollaborativeTopicModel:
         return result
 
 
-my_model = CollaborativeTopicModel()
-pickle.dump(model, open( "model.p", "wb" )
+# t_zero = time()
+#dat_model_doe = CollaborativeTopicModel(n_topic=75, n_voca=10000, nullval=3.5)
+#dat_model_doe.fit()
+#dat_model_doe.add_user({48385: 3, 69122: 3, 48516: 3, 7318: 2, 1: 5, 364: 1.5, 2571: 3, 48780: '', 85774: 2.3, 527: '', 8464: '', 2710: 4.0, 919: '', 45722: '', 82459: '', 79132: '', 6942: '', 4896: '', 72998: '', 7153: '', 1704: '', 2858: '', 1968: '', 5299: '', 8376: '', 1721: '', 318: '', 296: '', 72641: '', 1732: '', 2502: '', 780: '', 589: '', 593: '', 71379: '', 33493: '', 72407: '', 356: '', 2918: '', 54503: 3, 6377: '', 2028: 3.5, 56174: 5, 111: 2.0, 1265: 5.0, 5618: '', 1270: 3.0, 58559: ''})
+# pickle.dump(dat_model_doe, open("dat_model_doe.p", "wb"))
+
+# print(time() - t_zero)
+# print('done with small one')
+
+# t_zero = time()
+# the_biggest = CollaborativeTopicModel(n_topic=75, n_voca=10000, nullval=0, ratingsfile='data/ml-20m/ratings.csv', scriptsfile='py/final_matched.csv')
+
+# pickle.dump(the_biggest, open("the_biggest.p", "wb"))
+
+# print(time() - t_zero)
+# print('done with big one also')
