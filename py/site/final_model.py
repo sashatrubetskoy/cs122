@@ -12,6 +12,7 @@ class CollaborativeTopicModel:
 
     Wang, Chong, and David M. Blei. "Collaborative topic modeling for recommending scientific articles."
     Proceedings of the 17th ACM SIGKDD international conference on Knowledge discovery and data mining. ACM, 2011.
+    PAPER HERE: 
     Arguments
     ----------
     n_topic: number of topics (hyperparameter)
@@ -23,16 +24,17 @@ class CollaborativeTopicModel:
     nullval: number to use for 
     """
 
-    def __init__(self, n_topic = 75, lamu = 1, lamv = 10, n_voca = 5000, nullval = 2, n_iter = 5, e = 1e-100, error_diff = 0.001, params = 2, ratingsfile = 'ratings_100K.csv', scriptsfile = "matched1.csv"):
+    def __init__(self, printout = True, full = False, n_topic = 75, lamu = 0.05, lamv = 3000, n_voca = 5000, nullval = 3.5, e = 1e-100, error_diff = 0.001, params = 2, ratingsfile = 'ratings_100K.csv', scriptsfile = "matched1.csv"):
         
         #User x Item ratings matrix, Splitting into Train and Test, making dict of names to movieIDs
         print('Cleaning Ratings')
-        self.R, self.R_test, self.movienames = self.get_ratings_matrix(scriptsfile, ratingsfile, 0.9)
+        self.R, self.R_test, self.movienames = self.get_ratings_matrix(scriptsfile, ratingsfile, 0.9, full)
 
         #Build Topic Model
-        file = open('lda.txt', 'wb')
-        self.theta = my_topics.Lda_model(n_topic, n_voca, scriptsfile).get_topic_distribution()
-        pickle.dump(self.theta, file)
+
+        #self.lda = my_topics.Lda_model(n_topic, n_voca, scriptsfile)
+        self.lda = pickle.load(open('final_LDA.p', 'rb'))
+        self.theta = self.lda.topic_dist
 
         #lambda_u = sigma_u^2 / sigma^2
         self.lambda_u = lamu
@@ -44,9 +46,9 @@ class CollaborativeTopicModel:
         self.n_item = len(self.R.iloc[0])
         self.threshold = error_diff
         self.nullval = nullval
-        self.n_iter = n_iter
 
-        #Set confidence matrix params, values are either a if an item has been rated, or b, if it hasn't
+
+        #Set confidence matrix params [A,B], values are either A if an item has been rated, or B, if it hasn't
         if params == 0:
             self.params = [1/np.nanstd(self.R) ** 2, 0]
         elif params == 1:
@@ -72,9 +74,11 @@ class CollaborativeTopicModel:
         #INIT confidence matrix
         self.C = self.R.applymap(self.get_c)
         
-        self.errors = [None] * self.n_iter
+        self.errors = []
         self.train_error = None
         self.test_error = None
+
+        self.fit(printout)
 
     def binary(self, val):
         if np.isnan(val):
@@ -91,7 +95,7 @@ class CollaborativeTopicModel:
             return self.params[0]
 
     @staticmethod
-    def get_ratings_matrix(scriptsfile, ratingsfile, hyperparameter):
+    def get_ratings_matrix(scriptsfile, ratingsfile, hyperparameter, full):
         print('Combining movie and item indexing...')
         # Reads in movies from the matched file
         df_movies = pd.read_csv(scriptsfile, usecols = ['movieId', 'title'])
@@ -100,6 +104,10 @@ class CollaborativeTopicModel:
         df_movies = df_movies.drop_duplicates(subset='movieId')
         # Reads in ratings from the movie lens rating file
         df_ratings = pd.read_csv(ratingsfile, usecols=['userId', 'movieId', 'rating'])
+        
+        if not full:
+            df_ratings = df_ratings.groupby('movieId').filter(lambda x: len(x) > 50)
+
         s = set(df_ratings['movieId'])
         # Joins ratings and movies from matched final using movieId
         df = df_movies.merge(df_ratings, on='movieId')
@@ -140,26 +148,29 @@ class CollaborativeTopicModel:
 
 
 
-    def fit(self):
+    def fit(self, print_out, n_iter = 20):
         print("Learning U and V...\n")
         t0 = time()
         old_err = 0
         num_iter = 0
-        for iteration in range(self.n_iter):
-            print('Finished {} iterations'.format(num_iter))
+        for iteration in range(n_iter):
+            print('Finished {} iterations\n'.format(num_iter))
 
-            self.do_e_step()
+            self.do_e_step(print_out)
 
             err = self.error()
-            self.errors[num_iter] = err
+            self.errors.append(err)
 
             num_iter += 1
             
             if abs(old_err - err) < self.threshold:
                 print('Error threshold reached!')
+                self.errors = self.errors[:num_iter]
                 break
             else:
                 old_err = err
+
+        self.errors = self.errors[:num_iter]
             
         print('Finished training with {} iterations in {} seconds'.format(num_iter, time() - t0))
 
@@ -188,101 +199,101 @@ class CollaborativeTopicModel:
         return err
 
     #Perform one iteration of updates
-    def do_e_step(self):
-        u = np.matrix(self.U)
-        v = np.matrix(self.V)
-        self.update_u(u,v)
-        self.update_v(u,v)
+    def do_e_step(self, printout):
+        self.update_u(printout)
+        self.update_v(printout)
 
     #Update all the elements of U
-    def update_u(self, u, v, hybrid = True):
+    def update_u(self, printout, hybrid = True):
+        v = np.matrix(self.V)
         t0 = time()
-        print('Updating Users')
+        print('Updating Users...')
 
         #Vectorized operation of applying update step
-        new_u = np.array(list(map(self.get_new_uservec, range(self.n_user), self.n_user * [u], self.n_user * [v]))).T
+        new_u = np.array(list(map(self.get_new_uservec, range(self.n_user), self.n_user * [v], self.n_user * [printout]))).T
 
         #Changing elements of U
         self.U.update(new_u)
-        print('Finished Users in {}'.format(time() - t0))
+        print('Finished Users in {}\n'.format(time() - t0))
 
-    def get_new_uservec(self, ui, u, v):
-        print('Updating User {}'.format(ui))
+    def get_new_uservec(self, ui, v, printout):
+        if printout:
+            print('Updating User {}'.format(ui))
         #retrieving all components of equation
         c_i = np.matrix(np.diag(self.C.iloc[ui]))
         r_i = np.copy(self.R.iloc[ui])
         r_i[np.isnan(r_i)] = self.nullval
         r_i = np.matrix(r_i).T
-            
+        
+        #performing computation, equation comes from page 4 of paper linked at the top of this file
         left = v * c_i * v.T + (self.lambda_u * np.identity(self.n_topic))
         return np.array(numpy.linalg.solve(left, v * c_i * r_i)).flatten()
 
-    def update_v(self, u, v, hybrid = True):
+    def update_v(self, printout, hybrid = True):
+        print('Updating Movies...')
         t0 = time()
-        print('Updating Movies')
+        u = np.matrix(self.U)
+
+        #Changing each item vector
         for vj in self.V.columns:
-        	self.V[vj] = self.get_new_movievec(vj, u, v)
-        print('Finished Movies in {}'.format(time() - t0))
+        	self.V[vj] = self.get_new_movievec(vj, u, printout)
+        print('Finished Movies in {}\n'.format(time() - t0))
 
 
-    def get_new_movievec(self, vj, u, v):
-        print('Updating Movie: {}'.format(self.movienames[vj]))
+    def get_new_movievec(self, vj, u, printout):
+        if printout:
+            print('Updating Movie: {}'.format(self.movienames[vj]))
 
+        #retrieving components of equation
         c_j = np.matrix(np.diag(np.copy(self.C[vj])))
         r_j = np.copy(self.R[vj])
         r_j[np.isnan(r_j)] = self.nullval
         r_j = np.matrix(r_j).T
-
         theta_j = np.matrix(self.theta.loc[vj]).T
+
+        #performing computation, equation comes from page 4 of paper linked at the top of this file
         left = u * c_j * u.T + (self.lambda_v * np.identity(self.n_topic))
         out =np.array(np.linalg.solve(left, u * c_j * r_j + (self.lambda_v * theta_j))).flatten()
         return out
 
     #movie_ratings is a dictionarry with movieIDs for keys and ratings for values
-    def add_user(self, movie_ratings):
+    def add_user(self, movie_ratings, topics_to_see = 10, words_to_see = 20):
+
 
         new_user_id = self.R.index.values.max() + 1
-        self.R.loc[new_user_id] = self.nullval
-        self.R_test.loc[new_user_id] = self.nullval
+        self.R.loc[new_user_id] = np.nan
+        self.R_test.loc[new_user_id] = np.nan
 
+        #set ratings of new user
         for movieid in movie_ratings.keys():
-            if movieid in self.R.columns.tolist():
-                if movie_ratings[movieid] != '':
-                    self.R.set_value(len(self.R)-1, movieid, movie_ratings[movieid])
-                    self.R_test.set_value(len(self.R_test)-1, movieid, movie_ratings[movieid])
+            if movieid in self.R.columns and movie_ratings[movieid] != '':
+                    self.R.set_value(new_user_id, movieid, movie_ratings[movieid])
+                    self.R_test.set_value(new_user_id, movieid, movie_ratings[movieid])
 
+        #updates to model attributes U and C
+        self.C.ix[new_user_id] = (list(map(self.get_c, self.R.ix[new_user_id])))
 
-        self.C = self.R.applymap(self.get_c)
-        print(self.C.shape)
         new_latent_vector = np.random.multivariate_normal(np.zeros(self.n_topic), np.identity(self.n_topic) * (1. / self.lambda_u))
         self.U[new_user_id] = new_latent_vector
-        #self.U[:,:-1] = new_latent_vector
         self.n_user += 1
+
+        #relearning
         self.fit()
+
+        #retrieving recommendations based on predicted ratings
         predictions_matrix = self.predict_item()
         predictions = pd.Series(predictions_matrix[predictions_matrix.shape[0]-1], index=self.V.columns)
-        recs = predictions.sort_values(ascending=False)[:5]
+        recs = predictions.sort_values(ascending=False)[:10]
 
         result = []
         for r in recs.index.values:
             result.append((r,self.movienames[r]))
-        print(result)
+
+        #topics = self.U[new_user_id].sort_values(ascending = False).index.values[:topics_to_see]
+        #self.topics = self.lda.get_topics(topics, words_to_see)
+
         return result
 
 
-# t_zero = time()
-#dat_model_doe = CollaborativeTopicModel(n_topic=75, n_voca=10000, nullval=3.5)
-#dat_model_doe.fit()
-#dat_model_doe.add_user({48385: 3, 69122: 3, 48516: 3, 7318: 2, 1: 5, 364: 1.5, 2571: 3, 48780: '', 85774: 2.3, 527: '', 8464: '', 2710: 4.0, 919: '', 45722: '', 82459: '', 79132: '', 6942: '', 4896: '', 72998: '', 7153: '', 1704: '', 2858: '', 1968: '', 5299: '', 8376: '', 1721: '', 318: '', 296: '', 72641: '', 1732: '', 2502: '', 780: '', 589: '', 593: '', 71379: '', 33493: '', 72407: '', 356: '', 2918: '', 54503: 3, 6377: '', 2028: 3.5, 56174: 5, 111: 2.0, 1265: 5.0, 5618: '', 1270: 3.0, 58559: ''})
-# pickle.dump(dat_model_doe, open("dat_model_doe.p", "wb"))
-
-# print(time() - t_zero)
-# print('done with small one')
-
-# t_zero = time()
-# the_biggest = CollaborativeTopicModel(n_topic=75, n_voca=10000, nullval=0, ratingsfile='data/ml-20m/ratings.csv', scriptsfile='py/final_matched.csv')
-
-# pickle.dump(the_biggest, open("the_biggest.p", "wb"))
-
-# print(time() - t_zero)
-# print('done with big one also')
+my_model = CollaborativeTopicModel()
+pickle.dump(model, open( "model.p", "wb" )
