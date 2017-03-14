@@ -148,7 +148,7 @@ class CollaborativeTopicModel:
 
 
 
-    def fit(self, print_out = True, n_iter = 20):
+    def fit(self, converge = True, print_out = True, n_iter = 20):
         print("Learning U and V...\n")
         t0 = time()
         old_err = 0
@@ -163,11 +163,11 @@ class CollaborativeTopicModel:
 
             num_iter += 1
             
-            if abs(old_err - err) < self.threshold:
-                print('Error threshold reached!')
-                self.errors = self.errors[:num_iter]
-                break
-            else:
+            if converge:
+                if abs(old_err - err) < self.threshold:
+                    print('Error threshold reached!')
+                    self.errors = self.errors[:num_iter]
+                    break
                 old_err = err
 
         self.errors = self.errors[:num_iter]
@@ -278,7 +278,7 @@ class CollaborativeTopicModel:
         self.n_user += 1
 
         #relearning
-        self.fit()
+        self.fit(converge = False)
 
         #retrieving recommendations based on predicted ratings
         predictions_matrix = self.predict_item()
@@ -298,21 +298,3 @@ class CollaborativeTopicModel:
         #self.topics = self.lda.get_topics(topics, words_to_see)
 
         return result
-
-
-# t_zero = time()
-#dat_model_doe = CollaborativeTopicModel(n_topic=75, n_voca=10000, nullval=3.5)
-#dat_model_doe.fit()
-#dat_model_doe.add_user({48385: 3, 69122: 3, 48516: 3, 7318: 2, 1: 5, 364: 1.5, 2571: 3, 48780: '', 85774: 2.3, 527: '', 8464: '', 2710: 4.0, 919: '', 45722: '', 82459: '', 79132: '', 6942: '', 4896: '', 72998: '', 7153: '', 1704: '', 2858: '', 1968: '', 5299: '', 8376: '', 1721: '', 318: '', 296: '', 72641: '', 1732: '', 2502: '', 780: '', 589: '', 593: '', 71379: '', 33493: '', 72407: '', 356: '', 2918: '', 54503: 3, 6377: '', 2028: 3.5, 56174: 5, 111: 2.0, 1265: 5.0, 5618: '', 1270: 3.0, 58559: ''})
-# pickle.dump(dat_model_doe, open("dat_model_doe.p", "wb"))
-
-# print(time() - t_zero)
-# print('done with small one')
-
-# t_zero = time()
-# the_biggest = CollaborativeTopicModel(n_topic=75, n_voca=10000, nullval=0, ratingsfile='data/ml-20m/ratings.csv', scriptsfile='py/final_matched.csv')
-
-# pickle.dump(the_biggest, open("the_biggest.p", "wb"))
-
-# print(time() - t_zero)
-# print('done with big one also')
