@@ -25,6 +25,9 @@ def get_letter_urls(start_url):
 
 
 def get_num_pages(letter_url):
+    '''
+    Given a letter url, return how many pages there are for that letter.
+    '''
     result = requests.get(letter_url)
     c = result.content
     soup = BeautifulSoup(c, 'lxml')
