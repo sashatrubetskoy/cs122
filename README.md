@@ -3,8 +3,8 @@
 
 ### How to run the website
 We have already trained and fitted a model for the web interface to use. In order to run the site with this model, please do the following:
-1. Download this file from this Google Drive link. It should be close to 500 MB when unzipped.
-2. Move the file, `fittedmodelfile.p`, into `cs122/py/site`.
+1. Download the file from [this Google Drive link](https://drive.google.com/file/d/0B-Zg2Odn-W_wXzEtdnQtZzQ5dTQ/view?usp=sharing). It should be close to 500 MB when unzipped.
+2. Move the file, `model.p`, into `cs122/py/site`.
 3. To run the web interface demo, simply run this command from the `cs122` directory:
     ```sh
     $ python3 py/site/cherry.py
